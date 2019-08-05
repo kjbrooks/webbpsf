@@ -31,7 +31,11 @@ Road Map for Future Releases
 
 Version History and Change Log
 -------------------------------
-
+Version 0.8.1
+=============
+**Bug fixes and small changes:**
+- The WFIRST R062 filter bandpass red edge was corrected from 8000A to 7600A (@robelgeda)
+- NIRISS NRM mask was flipped along the X axis to match the as-built instrument and measured PSFs (#275, @KevinVolkSTScI, @anand0xff, @mperrin).
 
 Version 0.8.0
 =============

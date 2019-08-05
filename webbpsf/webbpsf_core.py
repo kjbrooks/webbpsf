@@ -92,15 +92,15 @@ class SpaceTelescopeInstrument(poppy.instrument.Instrument):
     source_offset_theta : float
         Position angle for that offset, in degrees CCW.
     pupil_shift_x, pupil_shift_y : float
-        Relative shift of the intermediate (coronagraphic) pupil in X and Y 
+        Relative shift of the intermediate (coronagraphic) pupil in X and Y
         relative to the telescope entrance pupil, expressed as a decimal between -1.0-1.0
         Note that shifting an array too much will wrap around to the other side unphysically, but
         for reasonable values of shift this is a non-issue.  This option only has an effect for optical models that
         have something at an intermediate pupil plane between the telescope aperture and the detector.
     pupil_rotation : float
-        Relative rotation of the intermediate (coronagraphic) pupil relative to 
+        Relative rotation of the intermediate (coronagraphic) pupil relative to
         the telescope entrace pupil, expressed in degrees counterclockwise.
-        This option only has an effect for optical models that have something at 
+        This option only has an effect for optical models that have something at
         an intermediate pupil plane between the telescope aperture and the detector.
     rebin : bool
         For output files, write an additional FITS extension including a version of the output array
@@ -120,10 +120,10 @@ class SpaceTelescopeInstrument(poppy.instrument.Instrument):
         to intermediate pupil and image planes whether or not they contain any actual optics, rather than
         taking the straight-to-MFT shortcut)
     no_sam : bool
-        Set this to prevent the SemiAnalyticMethod coronagraph mode from being 
-        used when possible, and instead do the brute-force FFT calculations. 
+        Set this to prevent the SemiAnalyticMethod coronagraph mode from being
+        used when possible, and instead do the brute-force FFT calculations.
         This is usually not what you want to do, but is available for comparison tests.
-        The SAM code will in general be much faster than the FFT method, 
+        The SAM code will in general be much faster than the FFT method,
         particularly for high oversampling.
 
     """
@@ -183,9 +183,9 @@ class SpaceTelescopeInstrument(poppy.instrument.Instrument):
         """Filename *or* fits.HDUList for pupil OPD.
 
         This can be either a full absolute filename, or a relative name in which case it is
-        assumed to be within the instrument's `data/OPDs/` directory, or an actual 
-        fits.HDUList object corresponding to such a file. If the file contains a 
-        datacube, you may set this to a tuple (filename, slice) to select a 
+        assumed to be within the instrument's `data/OPDs/` directory, or an actual
+        fits.HDUList object corresponding to such a file. If the file contains a
+        datacube, you may set this to a tuple (filename, slice) to select a
         given slice, or else the first slice will be used."""
         self.pupil_radius = None  # Set when loading FITS file in _get_optical_system
 
@@ -627,10 +627,10 @@ class JWInstrument(SpaceTelescopeInstrument):
     pupilopd = None
     """Filename *or* fits.HDUList for JWST pupil OPD.
 
-    This can be either a full absolute filename, or a relative name in which 
-    case it is assumed to be within the instrument's `data/OPDs/` directory, 
-    or an actual fits.HDUList object corresponding to such a file. If the file 
-    contains a datacube, you may set this to a tuple (filename, slice) to 
+    This can be either a full absolute filename, or a relative name in which
+    case it is assumed to be within the instrument's `data/OPDs/` directory,
+    or an actual fits.HDUList object corresponding to such a file. If the file
+    contains a datacube, you may set this to a tuple (filename, slice) to
     select a given slice, or else the first slice will be used."""
 
     def __init__(self, *args, **kwargs):
@@ -703,11 +703,12 @@ class JWInstrument(SpaceTelescopeInstrument):
         self._detector_geom_info = DetectorGeometry(self.name, self._detectors[self._detector])
 
     def _tel_coords(self):
-        """ Convert from detector pixel coordinates to SIAF aperture coordinates,
+        """ Convert from science frame coordinates to telescope frame coordinates using
+        SIAF transformations. Returns (V2, V3) tuple, in arcminutes.
 
-        Returns (V2, V3) tuple, in arcminutes.
         Note that the astropy.units framework is used to return the result as a
-        dimensional Quantity. """
+        dimensional Quantity.
+        """
 
         return self._detector_geom_info.pix2angle(self.detector_position[0], self.detector_position[1])
 
@@ -731,7 +732,7 @@ class JWInstrument(SpaceTelescopeInstrument):
         try:
             ap = siaf[aperture_name]
 
-            self.detector_position = (ap.XDetRef, ap.YDetRef)
+            self.detector_position = (ap.XSciRef, ap.YSciRef)
             detname = aperture_name.split('_')[0]
             self.detector = detname # As a side effect this auto reloads SIAF info, see detector.setter
             _log.debug("From {} set det. pos. to {} {}".format(aperture_name, detname, self.detector_position))
@@ -1801,7 +1802,7 @@ class NIRISS(JWInstrument):
         # AnalyticOpticalElement instances. Annoying but historical.
         if self.pupil_mask == 'MASK_NRM':
             optsys.add_pupil(transmission=self._datapath + "/optics/MASK_NRM.fits.gz", name=self.pupil_mask,
-                             flip_y=True, shift_x=shift_x, shift_y=shift_y, rotation=rotation)
+                             flip_y=True, flip_x=True, shift_x=shift_x, shift_y=shift_y, rotation=rotation)
             optsys.planes[-1].wavefront_display_hint = 'intensity'
         elif self.pupil_mask == 'CLEARP':
             optsys.add_pupil(optic=NIRISS_CLEARP(shift_x=shift_x, shift_y=shift_y, rotation=rotation))
@@ -2007,7 +2008,9 @@ class DetectorGeometry(object):
             raise ValueError("Detector pixels Y coordinate cannot be > {0}".format(int(self.shape[1]) - 1))
 
     def pix2angle(self, xpix, ypix):
-        """ Convert  from detector coordinates to telescope frame coordinates using SIAF transformations
+        """ Convert from science frame coordinates (in pixels) to telescope frame coordinates
+        (in arcminutes) using SIAF transformations.
+
         See the pysiaf code for all the full details, or Lallo & Cox Tech Reports
 
         Parameters
@@ -2105,4 +2108,3 @@ def one_segment_pupil(segmentname):
 
     newpupil[0].header['SEGMENT'] = segment_official_name
     return newpupil
-

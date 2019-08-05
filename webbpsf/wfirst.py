@@ -14,6 +14,7 @@ import numpy as np
 from . import webbpsf_core
 from scipy.interpolate import griddata
 from astropy.io import fits
+import astropy.units as u
 import logging
 
 _log = logging.getLogger('webbpsf')
@@ -65,10 +66,16 @@ class WavelengthDependenceInterpolator(object):
             # we have to interpolate @ this wavelength
             aberration_terms = griddata(self._wavelengths, self._aberration_terms, wavelength, method='linear')
             if np.any(np.isnan(aberration_terms)):
-                raise RuntimeError("Attempted to get aberrations at wavelength "
-                                   "outside the range of the reference data")
-            return aberration_terms
+                if isinstance(wavelength, u.Quantity):
+                    wavelength = wavelength.to(u.m).value
+                wavelength_closest = np.clip(wavelength, np.min(self._wavelengths), np.max(self._wavelengths))
+                _log.warn("Attempted to get aberrations at wavelength {:.2g} "
+                          "outside the range of the reference data; clipping to closest wavelength {:.2g}".format(
+                    wavelength, wavelength_closest))
 
+                aberration_terms = griddata(self._wavelengths, self._aberration_terms, wavelength_closest,
+                                            method='linear')
+            return aberration_terms
 
 class FieldDependentAberration(poppy.ZernikeWFE):
     """FieldDependentAberration incorporates aberrations that
@@ -99,7 +106,7 @@ class FieldDependentAberration(poppy.ZernikeWFE):
             interp_order=interp_order
         )
 
-    def get_opd(self, wave, units='meters'):
+    def get_opd(self, wave):
         """Set the Zernike coefficients (for ZernikeWFE.getOPD) based
         on the wavelength of the incoming wavefront and the pixel
         position
@@ -109,7 +116,7 @@ class FieldDependentAberration(poppy.ZernikeWFE):
         else:
             wavelength = wave.wavelength
         self.coefficients = wavelength * self.get_aberration_terms(wavelength)
-        return super(FieldDependentAberration, self).get_opd(wave, units=units)
+        return super(FieldDependentAberration, self).get_opd(wave)
 
     @property
     def field_position(self):
@@ -256,7 +263,7 @@ class WFIRSTInstrument(webbpsf_core.SpaceTelescopeInstrument):
 
     def _get_aberrations(self):
         """Get the OpticalElement that applies the field-dependent
-        optical aberrations. (Called in _getOpticalSystem.)"""
+        optical aberrations. (Called in _get_optical_system.)"""
         return self._detectors[self._detector]
 
     def _get_fits_header(self, result, options):
@@ -657,7 +664,7 @@ class CGI(WFIRSTInstrument):
 
     def _get_aberrations(self):
         """Get the OpticalElement that applies the field-dependent
-        optical aberrations. (Called in _getOpticalSystem.)"""
+        optical aberrations. (Called in _get_optical_system.)"""
         return None
 
     def _get_fits_header(self, result, options):
